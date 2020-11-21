@@ -630,11 +630,144 @@ plt.savefig('out/lc_137cs_bgd_energy_cut.png')
 
 ### 60Co の 1173 keV と 1332 keV のライン
 
+137Cs 同様に、60Co でのフィットを行うと以下のようになる。
+
+![](https://i.imgur.com/SzsCoeV.png)
+
+今回は、２つのガウス関数と連続成分は２次関数を仮定している。
+```
+┌───┬────────┬───────────┬───────────┬────────────┬────────────┬─────────┬─────────┬───────┐
+│   │ Name   │   Value   │ Hesse Err │ Minos Err- │ Minos Err+ │ Limit-  │ Limit+  │ Fixed │
+├───┼────────┼───────────┼───────────┼────────────┼────────────┼─────────┼─────────┼───────┤
+│ 0 │ mu1    │   89.90   │   0.05    │   -0.05    │    0.05    │         │         │       │
+│ 1 │ sigma1 │   2.46    │   0.07    │   -0.07    │    0.07    │         │         │       │
+│ 2 │ area1  │    230    │    10     │     -9     │     10     │         │         │       │
+│ 3 │ mu2    │  102.27   │   0.06    │   -0.06    │    0.06    │         │         │       │
+│ 4 │ sigma2 │   2.48    │   0.07    │   -0.07    │    0.07    │         │         │       │
+│ 5 │ area2  │    205    │     9     │     -9     │     9      │         │         │       │
+│ 6 │ c0     │    -30    │    26     │    -26     │     27     │         │         │       │
+│ 7 │ c1     │    1.1    │    0.6    │    -0.6    │    0.6     │         │         │       │
+│ 8 │ c2     │  -0.0073  │  0.0030   │  -0.0029   │   0.0030   │         │         │       │
+└───┴────────┴───────────┴───────────┴────────────┴────────────┴─────────┴─────────┴───────┘
+None
+<ValueView of Minuit at 7facab4500c0>
+  mu1: 89.89885681279526
+  sigma1: 2.4635201398282667
+  area1: 230.37813109658913
+  mu2: 102.27387615149468
+  sigma2: 2.476543896033184
+  area2: 205.07381204912983
+  c0: -29.742310299289525
+  c1: 1.095319696384393
+  c2: -0.007302664336358126
+<ErrorView of Minuit at 7facab4500c0>
+  mu1: 0.046191615919659215
+  sigma1: 0.07260118129707424
+  area1: 9.756022732605876
+  mu2: 0.055135061931318875
+  sigma2: 0.07349858005025595
+  area2: 8.936257391186867
+  c0: 26.114650409287663
+  c1: 0.565827150139758
+  c2: 0.0029774089088468775
+  ```
+
 ## ADC channel vs. Energy 
 
-- 137Cs 661.65 keV
-- 60Co 1173.23 keV
-- 60Co 1332.50 keV 
+さて、３本のラインでフィットができたので、Energy (keV) と ADC channel の相関を見てみる。
+
+| Ion | Energy (keV) | ADC channel | ADC error |
+| ----- | -------| ------| -----|
+| 137Cs | 661.65 | 50.46 | 0.08 |
+| 60Co  | 1173.23| 89.90 | 0.05 |
+| 60Co  | 1332.50| 102.27| 0.06 |
+
+```
+x = np.array([661.65,1173.23,1332.50],dtype='float') # energy 
+y = np.array([50.46,89.90,102.27],dtype='float') # channel 
+ye = np.array([0.08,0.05,0.06],dtype='float')
+
+x2r = Chi2Regression(linear, x, y, ye)
+fit = Minuit(x2r, m=1, c=2)
+fit.migrad()
+fit.minos() 
+print(fit.print_param())
+print(fit.values)
+print(fit.errors)
+
+fig = plt.figure(figsize=(8,5)) 
+plt.errorbar(x,y,yerr=ye,marker='o',ls='',color='k')
+model_x = range(0,15000)
+model_linear = [linear(i,fit.values[0],fit.values[1]) for i in model_x]
+plt.plot(model_x,model_linear,color='r',ls='--')
+plt.xlim(0,15000)
+plt.ylim(0,2**10)
+plt.xlabel('Energy (keV)', fontsize=10)
+plt.ylabel('ADC channel', fontsize=10)
+plt.tight_layout()
+plt.tick_params(axis="x",direction="in")
+plt.tick_params(axis="y",direction="in")
+plt.savefig('out/energy_vs_channel.png')
+```
+
+![](https://i.imgur.com/Ky6ySTf.png)
+
+```
+┌───┬──────┬───────────┬───────────┬────────────┬────────────┬─────────┬─────────┬───────┐
+│   │ Name │   Value   │ Hesse Err │ Minos Err- │ Minos Err+ │ Limit-  │ Limit+  │ Fixed │
+├───┼──────┼───────────┼───────────┼────────────┼────────────┼─────────┼─────────┼───────┤
+│ 0 │ m    │ 77.20e-3  │  0.15e-3  │  -0.15e-3  │  0.15e-3   │         │         │       │
+│ 1 │ c    │   -0.64   │   0.17    │   -0.17    │    0.17    │         │         │       │
+└───┴──────┴───────────┴───────────┴────────────┴────────────┴─────────┴─────────┴───────┘
+None
+<ValueView of Minuit at 7fc4f78f78b0>
+  m: 0.07720473893135693
+  c: -0.6438362818461201
+<ErrorView of Minuit at 7fc4f78f78b0>
+  m: 0.00014678653797836546
+  c: 0.1695069711635306
+```
+
+となるので、
+
+$\frac{\textrm{ADC}}{\textrm{ch}} = 0.0772 \times \left(\frac{\textrm{Energy}}{\textrm{keV}}\right) - 0.644$
+
+という関係にあることがわかる。2^10=1024 channel は約 13 MeV に対応することがわかる。
+
+### 環境バックグラウンド
+
+最後に、ADC channel をエネルギーに変換できるようになったので、X軸をエネルギー、Y軸を Counts/bin ではなく、Counts/sec/keV の次元にそろえてみる。
+
+```
+exposure = 15 * 60  
+
+hist_y, edge = np.histogram(df_bgd['pha'], bins=2**10,range=(-0.5, 2**10-0.5))
+hist_x = (edge[:-1] + edge[1:]) / 2.
+hist_xe = (edge[:-1] - edge[1:]) / 2.
+hist_ye = np.sqrt(hist_y)
+
+x = (hist_x+0.644)/0.0772/1000.0
+xe = hist_xe/0.0772/1000.0
+y = 1/77.2 * hist_y / exposure 
+ye = 1/77.2 * hist_ye / exposure 
+
+fig, ax = plt.subplots(1,1,figsize=(11.69,8.27))
+plt.errorbar(x,y,xerr=xe,yerr=ye,marker='',drawstyle='steps-mid',color='k')
+plt.xlabel('Energy (MeV)', fontsize=13)
+plt.ylabel('Counts/sec/keV', fontsize=13)
+plt.xscale('log')				
+plt.yscale('log')
+plt.xlim(0.3,13.0)
+plt.tight_layout(pad=2)
+plt.tick_params(labelsize=12)
+plt.tick_params(axis="x",direction="in")
+plt.tick_params(axis="y",direction="in")
+plt.savefig('out/spec_bgd_energy.png')
+```
+
+![](https://i.imgur.com/944u5jL.png)
+
+などとなる。
 
 ## ROOT のようにヒストグラムに詰める
 
@@ -672,6 +805,10 @@ plt.xlabel('Energy (keV)');plt.ylabel('Count/bin')
 plt.show()
 ```
 なお、ここでの `du_clevt['EVENTS'].data['PI']` はイベントの array です。FITS 形式の説明のあとで使えるようになります。
+
+
+
+
  
 ## 参考文献
 
